@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Weekly Editor</title>
+<style>
+:root {
+  --bg:      #f5f7fb;
+  --panel:   #ffffff;
+  --panel-2: #f9fafc;
+  --text:    #1f2937;
+  --muted:   #6b7280;
+  --faint:   #9ca3af;
+  --border:  #d6dbe5;
+  --border2: #cdd0d7;
+  --primary: #2563eb;
+  --primary-2:#1d4ed8;
+  --danger:  #dc2626;
+
+  --done-c:  #0f7f56; --done-bg: #edfaf4; --done-br: #86efca;
+  --prog-c:  #b45309; --prog-bg: #fffbeb; --prog-br: #fcd34d;
+  --hold-c:  #5b21b6; --hold-bg: #f5f3ff; --hold-br: #c4b5fd;
+  --plan-c:  #0f6090; --plan-bg: #eff9ff; --plan-br: #7dd3fc;
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: 'Inter', 'Pretendard Variable', Pretendard, sans-serif;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 8px 24px rgba(15,23,42,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  height: 52px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.topbar-brand {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.topbar-brand em { color: var(--primary); font-style: normal; }
+.divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 200px;
+  overflow: hidden;
+}
+.file-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-none  { background: var(--border2); }
+.dot-saved { background: #22c55e; }
+.dot-dirty { background: #f59e0b; animation: pulse 1.4s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+.topbar-space { flex: 1; }
+
+/* ── LAYOUT ── */
+.layout {
+  display: flex;
+  height: calc(100vh - 52px);
+  overflow: hidden;
+}
+.editor-col {
+  flex: 0 0 auto;
+  width: 55%;
+  overflow-y: auto;
+  height: 100%;
+  padding: 20px;
+  border-right: 1px solid var(--border);
+}
+.splitter {
+  flex: 0 0 5px;
+  width: 5px;
+  background: var(--border);
+  cursor: col-resize;
+  position: relative;
+  transition: background 0.15s;
+  z-index: 10;
+}
+.splitter:hover, .splitter.dragging { background: var(--primary); }
+.splitter::after { content:''; position:absolute; inset:0 -4px; }
+.preview-col {
+  flex: 1 1 0;
+  min-width: 200px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── PANEL (editor area cards) ── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.panel-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panel-header-left { display: flex; flex-direction: column; gap: 2px; }
+.panel-title { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.panel-subtitle { font-size: 12px; color: var(--faint); }
+.panel-body { padding: 16px 18px; }
+
+/* ── BUTTONS ── */
+button, .button {
+  font-family: var(--sans);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  padding: 7px 13px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+button:hover, .button:hover { background: var(--bg); border-color: var(--border2); }
+.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+.primary:hover { background: var(--primary-2); border-color: var(--primary-2); }
+.danger { color: var(--danger); border-color: #fecaca; background: #fff5f5; }
+.danger:hover { background: #fee; }
+.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.ghost:hover { background: var(--bg); border-color: var(--border); color: var(--text); }
+.btn-sm { font-size: 12px; padding: 5px 10px; }
+.btn-icon { padding: 5px 8px; font-size: 15px; line-height: 1; }
+
+.toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* ── FIELDS ── */
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.field input, .field textarea, .field select {
+  width: 100%;
+  font-family: var(--sans);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--text);
+  line-height: 1.5;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  outline: none;
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+}
+.field textarea { resize: vertical; min-height: 62px; }
+
+/* ── SUMMARY CARD ── */
+.summary-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  background: var(--panel-2);
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.summary-box h3 { margin: 0 0 10px; font-size: 15px; }
+.summary-grid { display: flex; flex-direction: column; gap: 8px; }
+.summary-hint { font-size: 12px; color: var(--faint); margin-top: 6px; }
+
+/* ── SECTION CARD ── */
+.section-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 12px;
+  animation: fadeUp 0.18s ease;
+  box-shadow: var(--shadow);
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.section-title-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.section-title { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.section-subtitle { font-size: 12px; color: var(--muted); }
+.section-meta {
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  background: #fdfeff;
+}
+.section-body { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.section-add-row { padding: 0 14px 12px; }
+
+/* ── ITEM CARD (with status stripe) ── */
+.item-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  animation: fadeUp 0.15s ease;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+.item-card.status-완료   { border-left: 3px solid var(--done-c); }
+.item-card.status-진행중  { border-left: 3px solid var(--prog-c); }
+.item-card.status-홀딩   { border-left: 3px solid var(--hold-c); }
+.item-card.status-예정   { border-left: 3px solid var(--plan-c); }
+
+.item-head {
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+}
+
+/* ── STATUS PILL ── */
+.status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: 0.12s;
+}
+.status-pill:hover { filter: brightness(0.95); }
+.status-pill.status-완료   { color: var(--done-c); background: var(--done-bg); border-color: var(--done-br); }
+.status-pill.status-진행중  { color: var(--prog-c); background: var(--prog-bg); border-color: var(--prog-br); }
+.status-pill.status-홀딩   { color: var(--hold-c); background: var(--hold-bg); border-color: var(--hold-br); }
+.status-pill.status-예정   { color: var(--plan-c); background: var(--plan-bg); border-color: var(--plan-br); }
+
+.status-select-hidden { display: none; }
+
+.item-title-input {
+  flex: 1;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  min-width: 0;
+}
+.item-title-input::placeholder { color: var(--faint); }
+.item-head-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+.item-body {
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.item-body .full { grid-column: 1 / -1; }
+
+/* ── STATUS POPUP ── */
+.status-popup {
+  position: absolute;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  overflow: hidden;
+  z-index: 300;
+  min-width: 100px;
+}
+.status-popup-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-popup-item:hover { background: var(--bg); }
+.status-popup-item .status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* ── PREVIEW PANEL ── */
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  flex-shrink: 0;
+}
+.preview-label { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.preview-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+}
+textarea#preview {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  white-space: pre-wrap;
+}
+.preview-rules {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.6;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── ANIM ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hidden { display: none !important; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1100px) {
+  .layout { flex-direction: column; height: auto; overflow: visible; }
+  .editor-col { width: 100% !important; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  .splitter { display: none; }
+  .preview-col { height: 500px; }
+  textarea#preview { min-height: 400px; }
+}
+@media (max-width: 720px) {
+  .meta-grid, .section-meta, .item-body { grid-template-columns: 1fr; }
+  .item-body .full { grid-column: 1; }
+  .topbar { padding: 0 12px; gap: 6px; flex-wrap: wrap; height: auto; min-height: 52px; padding-top: 8px; padding-bottom: 8px; }
+  .toolbar { flex-direction: column; width: 100%; }
+  .toolbar button, .toolbar .button { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">Weekly<em>.</em>Editor</div>
+  <div class="divider"></div>
+  <div class="file-chip">
+    <span class="dot dot-none" id="fileDot"></span>
+    <span id="fileName">파일 없음</span>
+  </div>
+  <button class="btn-sm" onclick="openFile()">열기</button>
+  <button class="btn-sm primary" onclick="newFile()">새 파일</button>
+  <div class="topbar-space"></div>
+  <div class="toolbar">
+    <button class="btn-sm" id="btnCarryOver">↑ 이번주 초안</button>
+    <label class="button btn-sm" for="fileImport">JSON 불러오기</label>
+    <input type="file" id="fileImport" accept="application/json" class="hidden"/>
+    <button class="btn-sm" onclick="exportJson()">JSON 저장</button>
+    <button class="btn-sm danger" onclick="resetAll()">초기화</button>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- EDITOR COLUMN -->
+  <div class="editor-col" id="editorCol">
+
+    <!-- META -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <span class="panel-title">편집</span>
+          <span class="panel-subtitle">팀 정보 및 핵심 요약</span>
+        </div>
+        <div class="toolbar">
+          <button class="btn-sm" id="btnAddSection">+ 섹션 추가</button>
+          <button class="btn-sm primary" onclick="generatePreview()">미리보기 생성</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="meta-grid">
+          <div class="field">
+            <label for="teamName">팀명</label>
+            <input id="teamName" type="text" placeholder="예: 개발1팀"/>
+          </div>
+          <div class="field">
+            <label for="weekLabel">주차 / 기간</label>
+            <input id="weekLabel" type="text" placeholder="예: 03.10 - 03.14"/>
+          </div>
+        </div>
+
+        <div class="summary-box">
+          <h3>핵심 요약</h3>
+          <div class="summary-grid">
+            <div class="field"><input id="summary1" type="text" placeholder="완료 항목 (예: v2.1.0 정기배포 QA 완료)"/></div>
+            <div class="field"><input id="summary2" type="text" placeholder="진행 항목 (예: 결제 모듈 리팩토링 진행 중)"/></div>
+            <div class="field"><input id="summary3" type="text" placeholder="이슈/다음 일정 (예: 신규 대시보드 UI 설계 착수)"/></div>
+          </div>
+          <div class="summary-hint">상위 책임자용 3줄 요약. 완료 1 · 진행 1 · 이슈 또는 다음 일정 1 권장</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTIONS -->
+    <div id="sections"></div>
+
+  </div>
+
+  <!-- SPLITTER -->
+  <div class="splitter" id="splitter"></div>
+
+  <!-- PREVIEW COLUMN -->
+  <div class="preview-col" id="previewCol">
+    <div class="preview-header">
+      <span class="preview-label">출력 미리보기</span>
+      <div class="toolbar">
+        <button class="btn-sm primary" id="btnCopy">텍스트 복사</button>
+      </div>
+    </div>
+    <div class="preview-body">
+      <textarea id="preview" spellcheck="false" placeholder="게시판 텍스트가 여기 표시됩니다"></textarea>
+      <div class="preview-rules">
+        출력 규칙<br/>
+        - 팀명 / 기간 / 핵심 요약<br/>
+        - 섹션 → 상태별 항목 (완료 → 진행중 → 홀딩 → 예정)<br/>
+        - 항목: 지난주 / 금주 / 다음 / 이슈 / 링크 순서<br/>
+        - 비어 있는 필드는 출력하지 않음
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- STATUS POPUP -->
+<div class="status-popup hidden" id="statusPopup">
+  <div class="status-popup-item" data-val="완료"><span class="status-dot" style="background:var(--done-c)"></span>완료</div>
+  <div class="status-popup-item" data-val="진행중"><span class="status-dot" style="background:var(--prog-c)"></span>진행중</div>
+  <div class="status-popup-item" data-val="홀딩"><span class="status-dot" style="background:var(--hold-c)"></span>홀딩</div>
+  <div class="status-popup-item" data-val="예정"><span class="status-dot" style="background:var(--plan-c)"></span>예정</div>
+</div>
+
+<!-- TEMPLATES -->
+<template id="sectionTemplate">
+  <div class="section-card">
+    <div class="section-header">
+      <div class="section-title-wrap">
+        <div class="section-title">새 섹션</div>
+        <div class="section-subtitle">프로젝트/버전 단위로 관리</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn-sm ghost" data-action="addItem">+ 항목</button>
+        <button class="btn-sm ghost btn-icon" data-action="duplicateSection" title="복제">⧉</button>
+        <button class="btn-sm danger btn-icon" data-action="removeSection" title="삭제">×</button>
+      </div>
+    </div>
+    <div class="section-meta">
+      <div class="field">
+        <label>섹션명</label>
+        <input data-field="name" type="text" placeholder="예: [서비스] 백엔드 API"/>
+      </div>
+      <div class="field">
+        <label>설명</label>
+        <input data-field="description" type="text" placeholder="예: 정기배포 / 결제 / 성능 개선"/>
+      </div>
+    </div>
+    <div class="section-body" data-role="items"></div>
+    <div class="section-add-row">
+      <button class="btn-sm ghost" data-action="addItemBottom">+ 항목 추가</button>
+    </div>
+  </div>
+</template>
+
+<template id="itemTemplate">
+  <div class="item-card status-진행중">
+    <div class="item-head">
+      <span class="status-pill status-진행중" data-action="openStatusPopup">진행중</span>
+      <select class="status-select-hidden" data-field="status">
+        <option value="완료">완료</option>
+        <option value="진행중" selected>진행중</option>
+        <option value="홀딩">홀딩</option>
+        <option value="예정">예정</option>
+      </select>
+      <input class="item-title-input" data-field="title" type="text" placeholder="항목명 (예: 결제 모듈 리팩토링)"/>
+      <div class="item-head-actions">
+        <button class="btn-sm ghost btn-icon" data-action="duplicateItem" title="복제">⧉</button>
+        <button class="btn-sm danger btn-icon" data-action="removeItem" title="삭제">×</button>
+      </div>
+    </div>
+    <div class="item-body">
+      <div class="field full">
+        <label>설명</label>
+        <textarea data-field="summary" placeholder="항목 요약 / 세부 내용"></textarea>
+      </div>
+      <div class="field">
+        <label>지난주</label>
+        <textarea data-field="lastWeek" placeholder="지난주 완료 내용"></textarea>
+      </div>
+      <div class="field">
+        <label>금주</label>
+        <textarea data-field="thisWeek" placeholder="이번주 진행 내용"></textarea>
+      </div>
+      <div class="field">
+        <label>다음</label>
+        <textarea data-field="nextWeek" placeholder="다음주 예정"></textarea>
+      </div>
+      <div class="field">
+        <label>이슈</label>
+        <textarea data-field="issue" placeholder="블로커 또는 이슈"></textarea>
+      </div>
+      <div class="field full">
+        <label>링크 (줄바꿈으로 여러 개)</label>
+        <textarea data-field="links" placeholder="https://"></textarea>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────
+const STORAGE_KEY = 'weekly-editor-v1';
+
+// ── FILE SYSTEM ───────────────────────────────────────────────────
+let fileHandle = null;
+let saveTimer  = null;
+let dirty      = false;
+
+const FILE_OPTS = { types: [{ description: 'Weekly JSON', accept: { 'application/json': ['.json'] } }] };
+
+async function newFile() {
+  if (!('showSaveFilePicker' in window)) {
+    setFileUI(null, '미저장 (JSON 저장 버튼 사용)');
+    return;
+  }
+  try {
+    fileHandle = await window.showSaveFilePicker({ suggestedName: 'weekly.json', ...FILE_OPTS });
+    setFileUI('saved', fileHandle.name);
+    await writeFile(collectData());
+  } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+}
+
+async function openFile() {
+  if (!('showOpenFilePicker' in window)) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      try {
+        fillData(JSON.parse(await f.text()));
+        setFileUI(null, f.name + ' (읽기전용)');
+      } catch { alert('파일을 읽을 수 없습니다.'); }
+    };
+    inp.click();
+    return;
+  }
+  try {
+    [fileHandle] = await window.showOpenFilePicker(FILE_OPTS);
+    const f = await fileHandle.getFile();
+    try { fillData(JSON.parse(await f.text())); } catch { fillData({}); }
+    setFileUI('saved', fileHandle.name);
+  } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+}
+
+async function writeFile(data) {
+  if (!fileHandle) return;
+  try {
+    const w = await fileHandle.createWritable();
+    await w.write(JSON.stringify(data, null, 2));
+    await w.close();
+    setFileUI('saved', fileHandle.name);
+    dirty = false;
+  } catch (e) { console.error('Save failed', e); }
+}
+
+function scheduleSave() {
+  dirty = true;
+  setFileUI('dirty', fileHandle?.name || '');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => writeFile(collectData()), 900);
+}
+
+function setFileUI(state, name) {
+  const dot = document.getElementById('fileDot');
+  const span = document.getElementById('fileName');
+  if (name) span.textContent = name;
+  dot.className = 'dot ' + (state === 'saved' ? 'dot-saved' : state === 'dirty' ? 'dot-dirty' : 'dot-none');
+}
+
+function exportJson() {
+  const data = collectData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `weekly-${(data.weekLabel || 'draft').replace(/[^\w.-]+/g, '-')}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── STATUS POPUP ──────────────────────────────────────────────────
+let activeStatusTarget = null;
+
+function openStatusPopup(pill) {
+  activeStatusTarget = pill.closest('.item-card');
+  const popup = document.getElementById('statusPopup');
+  const rect = pill.getBoundingClientRect();
+  popup.style.left = rect.left + 'px';
+  popup.style.top = (rect.bottom + 4) + 'px';
+  popup.style.position = 'fixed';
+  popup.classList.remove('hidden');
+}
+
+document.getElementById('statusPopup').querySelectorAll('.status-popup-item').forEach(item => {
+  item.addEventListener('click', () => {
+    if (!activeStatusTarget) return;
+    setItemStatus(activeStatusTarget, item.dataset.val);
+    document.getElementById('statusPopup').classList.add('hidden');
+    schedulePreview();
+    scheduleSave();
+  });
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#statusPopup') && !e.target.closest('[data-action="openStatusPopup"]')) {
+    document.getElementById('statusPopup').classList.add('hidden');
+  }
+});
+
+function setItemStatus(card, status) {
+  card.className = `item-card status-${status}`;
+  const pill = card.querySelector('.status-pill');
+  pill.className = `status-pill status-${status}`;
+  pill.textContent = status;
+  card.querySelector('[data-field="status"]').value = status;
+}
+
+// ── SECTION / ITEM BUILDERS ───────────────────────────────────────
+function addSection(data = null) {
+  const tpl = document.getElementById('sectionTemplate');
+  const node = tpl.content.firstElementChild.cloneNode(true);
+
+  const nameInp = node.querySelector('[data-field="name"]');
+  const descInp = node.querySelector('[data-field="description"]');
+  const itemsWrap = node.querySelector('[data-role="items"]');
+  const nameDisp = node.querySelector('.section-title');
+  const descDisp = node.querySelector('.section-subtitle');
+
+  nameInp.addEventListener('input', () => {
+    nameDisp.textContent = nameInp.value.trim() || '새 섹션';
+    schedulePreview(); scheduleSave();
+  });
+  descInp.addEventListener('input', () => {
+    descDisp.textContent = descInp.value.trim() || '프로젝트/버전 단위로 관리';
+    schedulePreview(); scheduleSave();
+  });
+
+  // Both "add item" buttons (header + bottom)
+  node.querySelectorAll('[data-action="addItem"], [data-action="addItemBottom"]').forEach(btn => {
+    btn.addEventListener('click', () => addItem(itemsWrap));
+  });
+  node.querySelector('[data-action="removeSection"]').addEventListener('click', () => {
+    node.remove(); schedulePreview(); scheduleSave();
+  });
+  node.querySelector('[data-action="duplicateSection"]').addEventListener('click', () => {
+    addSection(collectSection(node)); scheduleSave();
+  });
+
+  if (data) {
+    nameInp.value = data.name || '';
+    descInp.value = data.description || '';
+    nameDisp.textContent = data.name || '새 섹션';
+    descDisp.textContent = data.description || '프로젝트/버전 단위로 관리';
+    (data.items || []).forEach(item => addItem(itemsWrap, item));
+  } else {
+    addItem(itemsWrap);
+  }
+
+  document.getElementById('sections').appendChild(node);
+  schedulePreview();
+}
+
+function addItem(wrap, data = null) {
+  const tpl = document.getElementById('itemTemplate');
+  const node = tpl.content.firstElementChild.cloneNode(true);
+
+  node.querySelector('[data-action="openStatusPopup"]').addEventListener('click', e => {
+    e.stopPropagation();
+    openStatusPopup(e.currentTarget);
+  });
+  node.querySelector('[data-action="removeItem"]').addEventListener('click', () => {
+    node.remove(); schedulePreview(); scheduleSave();
+  });
+  node.querySelector('[data-action="duplicateItem"]').addEventListener('click', () => {
+    addItem(wrap, collectItem(node)); scheduleSave();
+  });
+
+  // Auto-preview on any input change
+  node.querySelectorAll('input, textarea, select').forEach(el => {
+    el.addEventListener('input', () => { schedulePreview(); scheduleSave(); });
+  });
+
+  if (data) {
+    node.querySelector('[data-field="title"]').value = data.title || '';
+    node.querySelector('[data-field="summary"]').value = data.summary || '';
+    node.querySelector('[data-field="lastWeek"]').value = data.lastWeek || '';
+    node.querySelector('[data-field="thisWeek"]').value = data.thisWeek || '';
+    node.querySelector('[data-field="nextWeek"]').value = data.nextWeek || '';
+    node.querySelector('[data-field="issue"]').value = data.issue || '';
+    node.querySelector('[data-field="links"]').value = (data.links || []).join('\n');
+    setItemStatus(node, data.status || '진행중');
+  }
+
+  wrap.appendChild(node);
+}
+
+// ── COLLECT DATA ──────────────────────────────────────────────────
+const trim = v => (v || '').replace(/\r/g, '').trim();
+const toLines = v => trim(v).split('\n').map(l => l.trim()).filter(Boolean);
+
+function collectItem(node) {
+  return {
+    status:   node.querySelector('[data-field="status"]').value,
+    title:    trim(node.querySelector('[data-field="title"]').value),
+    summary:  trim(node.querySelector('[data-field="summary"]').value),
+    lastWeek: trim(node.querySelector('[data-field="lastWeek"]').value),
+    thisWeek: trim(node.querySelector('[data-field="thisWeek"]').value),
+    nextWeek: trim(node.querySelector('[data-field="nextWeek"]').value),
+    issue:    trim(node.querySelector('[data-field="issue"]').value),
+    links:    toLines(node.querySelector('[data-field="links"]').value),
+  };
+}
+
+function collectSection(node) {
+  return {
+    name:        trim(node.querySelector('[data-field="name"]').value),
+    description: trim(node.querySelector('[data-field="description"]').value),
+    items: [...node.querySelectorAll('.item-card')].map(collectItem).filter(i => i.title),
+  };
+}
+
+function collectData() {
+  return {
+    teamName:  trim(document.getElementById('teamName').value),
+    weekLabel: trim(document.getElementById('weekLabel').value),
+    summary: [
+      trim(document.getElementById('summary1').value),
+      trim(document.getElementById('summary2').value),
+      trim(document.getElementById('summary3').value),
+    ].filter(Boolean),
+    sections: [...document.getElementById('sections').querySelectorAll('.section-card')]
+      .map(collectSection)
+      .filter(s => s.name || s.items.length),
+  };
+}
+
+function fillData(data) {
+  document.getElementById('teamName').value = data.teamName || '';
+  document.getElementById('weekLabel').value = data.weekLabel || '';
+  document.getElementById('summary1').value = data.summary?.[0] || '';
+  document.getElementById('summary2').value = data.summary?.[1] || '';
+  document.getElementById('summary3').value = data.summary?.[2] || '';
+  document.getElementById('sections').innerHTML = '';
+  (data.sections || []).forEach(s => addSection(s));
+  if (!data.sections?.length) addSection();
+  generatePreview();
+}
+
+// ── GENERATE PREVIEW ──────────────────────────────────────────────
+let previewTimer = null;
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(generatePreview, 250);
+}
+
+function bulletField(label, value) {
+  const lines = toLines(value);
+  if (lines.length === 0) return '';
+  return ['  ㄴ ' + label + ': ' + lines[0], ...lines.slice(1).map(l => '    ' + l)].join('\n');
+}
+
+function generatePreview() {
+  const data = collectData();
+  const out = [];
+
+  if (data.teamName) out.push(data.teamName);
+  if (data.weekLabel) out.push(`Weekly (${data.weekLabel})`);
+  out.push('');
+
+  if (data.summary.length) {
+    out.push('[핵심 요약]');
+    data.summary.forEach(l => out.push(`- ${l}`));
+    out.push('');
+  }
+
+  const statusOrder = ['완료', '진행중', '홀딩', '예정'];
+  data.sections.forEach((sec, si) => {
+    out.push(sec.name);
+    if (sec.description) out.push(`- ${sec.description}`);
+    out.push('');
+    statusOrder.forEach(status => {
+      sec.items.filter(i => i.status === status && i.title).forEach(item => {
+        out.push(`- [${item.status}] ${item.title}`);
+        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `  ㄴ ${l}` : `    ${l}`));
+        const lw = bulletField('지난주', item.lastWeek);
+        const tw = bulletField('금주', item.thisWeek);
+        const nw = bulletField('다음', item.nextWeek);
+        const is = bulletField('이슈', item.issue);
+        if (lw) out.push(lw);
+        if (tw) out.push(tw);
+        if (nw) out.push(nw);
+        if (is) out.push(is);
+        item.links.forEach(l => out.push(`  ㄴ 링크: ${l}`));
+        out.push('');
+      });
+    });
+    if (si < data.sections.length - 1) out.push('');
+  });
+
+  document.getElementById('preview').value = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// ── COPY ──────────────────────────────────────────────────────────
+function copyPreview() {
+  generatePreview();
+  const preview = document.getElementById('preview');
+  navigator.clipboard.writeText(preview.value).then(() => {
+    const btn = document.getElementById('btnCopy');
+    const t = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    setTimeout(() => btn.textContent = t, 1500);
+  }).catch(() => {
+    preview.select();
+    document.execCommand('copy');
+  });
+}
+
+// ── CARRY OVER ────────────────────────────────────────────────────
+function carryOverDraft() {
+  const data = collectData();
+  const next = {
+    teamName: data.teamName,
+    weekLabel: '',
+    summary: [],
+    sections: data.sections.map(s => ({
+      name: s.name,
+      description: s.description,
+      items: s.items
+        .filter(i => i.status !== '완료')
+        .map(i => ({
+          status:   i.status === '예정' ? '진행중' : i.status,
+          title:    i.title,
+          summary:  i.summary,
+          lastWeek: i.thisWeek || i.lastWeek,
+          thisWeek: i.nextWeek,
+          nextWeek: '',
+          issue:    i.issue,
+          links:    i.links || [],
+        }))
+    })).filter(s => s.items.length),
+  };
+  fillData(next);
+  scheduleSave();
+  alert('지난주 진행 항목 기준으로 이번주 초안을 생성했습니다.');
+}
+
+function resetAll() {
+  if (!confirm('모든 입력을 초기화합니다. 계속할까요?')) return;
+  fillData({ sections: [] });
+}
+
+// ── LOCAL STORAGE (fallback) ──────────────────────────────────────
+function saveLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(collectData(), null, 2));
+}
+
+function loadLocal() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return false;
+  try { fillData(JSON.parse(raw)); return true; } catch { return false; }
+}
+
+// ── KEYBOARD SHORTCUTS ────────────────────────────────────────────
+document.addEventListener('keydown', async e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (fileHandle) await writeFile(collectData());
+    else exportJson();
+  }
+});
+
+// ── EVENT BINDINGS ────────────────────────────────────────────────
+document.getElementById('btnAddSection').addEventListener('click', () => addSection());
+document.getElementById('btnCopy').addEventListener('click', copyPreview);
+document.getElementById('btnCarryOver').addEventListener('click', carryOverDraft);
+
+// Auto-preview for meta fields
+['teamName', 'weekLabel', 'summary1', 'summary2', 'summary3'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { schedulePreview(); scheduleSave(); });
+});
+
+document.getElementById('fileImport').addEventListener('change', e => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { fillData(JSON.parse(r.result)); } catch { alert('JSON 파싱 실패'); } };
+  r.readAsText(f, 'utf-8');
+  e.target.value = '';
+});
+
+window.addEventListener('beforeunload', e => {
+  saveLocal();
+  if (dirty) { writeFile(collectData()); e.preventDefault(); }
+});
+
+// ── SPLITTER ──────────────────────────────────────────────────────
+(function () {
+  const splitter = document.getElementById('splitter');
+  const editorCol = document.getElementById('editorCol');
+  const layout = splitter.parentElement;
+  let dragging = false;
+  let startX = 0;
+  let startW = 0;
+
+  splitter.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.clientX;
+    startW = editorCol.getBoundingClientRect().width;
+    splitter.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const totalW = layout.getBoundingClientRect().width;
+    const newW = Math.min(Math.max(startW + (e.clientX - startX), 320), totalW - 280 - 5);
+    editorCol.style.width = newW + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+// ── INIT ──────────────────────────────────────────────────────────
+const SAMPLE = {
+  teamName: '개발1팀',
+  weekLabel: '03.10 - 03.14',
+  summary: [
+    'v2.1.0 정기배포 QA 완료',
+    '결제 모듈 리팩토링 진행 중',
+    '신규 대시보드 UI 설계 착수',
+  ],
+  sections: [
+    {
+      name: '[서비스] 백엔드 API',
+      description: '정기배포 / 결제 / 성능 개선',
+      items: [
+        { status: '완료', title: 'v2.1.0 정기배포 QA', summary: 'API 응답 속도 개선 및 버그 수정 포함', lastWeek: 'QA 테스트 진행', thisWeek: 'QA 완료 및 배포', nextWeek: '', issue: '', links: [] },
+        { status: '진행중', title: '결제 모듈 리팩토링', summary: 'PG사 연동 구조 개선, 에러 핸들링 강화', lastWeek: '기존 코드 분석 및 설계', thisWeek: '핵심 모듈 리팩토링 진행', nextWeek: '단위 테스트 작성', issue: 'PG사 테스트 환경 접속 지연', links: [] },
+        { status: '예정', title: 'DB 마이그레이션 준비', summary: '사용자 테이블 구조 변경 예정', lastWeek: '', thisWeek: '마이그레이션 스크립트 작성', nextWeek: '스테이징 환경 테스트', issue: '', links: [] },
+      ],
+    },
+    {
+      name: '[서비스] 프론트엔드',
+      description: '대시보드 / UI 개선 / 접근성',
+      items: [
+        { status: '진행중', title: '신규 대시보드 UI 설계', summary: '디자인 시안 기반 컴포넌트 구조 설계', lastWeek: '디자인 시안 검토', thisWeek: '컴포넌트 구조 설계 진행', nextWeek: '프로토타입 개발', issue: '', links: [] },
+        { status: '홀딩', title: '다크모드 지원', summary: '디자인 가이드 확정 대기', lastWeek: '기술 검토 완료', thisWeek: '', nextWeek: '', issue: '디자인 가이드 미확정', links: [] },
+      ],
+    },
+  ],
+};
+
+// Try loading from localStorage first, fallback to sample
+if (!loadLocal()) {
+  fillData(SAMPLE);
+}
+</script>
+</body>
+</html>
