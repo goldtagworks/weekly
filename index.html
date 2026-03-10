@@ -588,6 +588,17 @@ textarea#preview {
 // ── CONSTANTS ─────────────────────────────────────────────────────
 const STORAGE_KEY = 'weekly-editor-v1';
 
+function formatDateForFilename(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getWeeklyFilename() {
+  return `weekly-${formatDateForFilename()}.json`;
+}
+
 // ── FILE SYSTEM ───────────────────────────────────────────────────
 let fileHandle = null;
 let saveTimer  = null;
@@ -601,7 +612,7 @@ async function newFile() {
     return;
   }
   try {
-    fileHandle = await window.showSaveFilePicker({ suggestedName: 'weekly.json', ...FILE_OPTS });
+    fileHandle = await window.showSaveFilePicker({ suggestedName: getWeeklyFilename(), ...FILE_OPTS });
     setFileUI('saved', fileHandle.name);
     await writeFile(collectData());
   } catch (e) { if (e.name !== 'AbortError') console.error(e); }
@@ -659,7 +670,7 @@ function exportJson() {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `weekly-${(data.weekLabel || 'draft').replace(/[^\w.-]+/g, '-')}.json`;
+  a.download = getWeeklyFilename();
   a.click();
   URL.revokeObjectURL(a.href);
 }
