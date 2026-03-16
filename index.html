@@ -1230,7 +1230,7 @@ function schedulePreview() {
 function bulletField(label, value) {
   const lines = toLines(value);
   if (lines.length === 0) return '';
-  return ['  ㄴ ' + label + ': ' + lines[0], ...lines.slice(1).map(l => '    ' + l)].join('\n');
+  return ['    ㄴ ' + label + ': ' + lines[0], ...lines.slice(1).map(l => '      ' + l)].join('\n');
 }
 
 function generateWeeklyPreview() {
@@ -1255,7 +1255,7 @@ function generateWeeklyPreview() {
     statusOrder.forEach(status => {
       sec.items.filter(i => i.status === status && i.title).forEach(item => {
         out.push(`• [${item.status}]${item.title ? ' ' + item.title : ''}`);
-        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `  ㄴ ${l}` : `    ${l}`));
+        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `    ㄴ ${l}` : `      ${l}`));
         const lw = bulletField('지난주', item.lastWeek);
         const tw = bulletField('금주', item.thisWeek);
         const nw = bulletField('다음', item.nextWeek);
@@ -1264,7 +1264,7 @@ function generateWeeklyPreview() {
         if (tw) out.push(tw);
         if (nw) out.push(nw);
         if (is) out.push(is);
-        item.links.forEach(l => out.push(`  ㄴ 링크: ${l}`));
+        item.links.forEach(l => out.push(`    ㄴ 링크: ${l}`));
         out.push('');
       });
     });
@@ -1295,7 +1295,8 @@ function generateMonthlyPreview() {
       }
       const lines = toLines(issue.content);
       lines.forEach(line => {
-        out.push(line.startsWith('-') ? line : `- ${line}`);
+        const stripped = line.replace(/^[-•]\s*/, '');
+        out.push(`    - ${stripped}`);
       });
       if (lines.length) out.push('');
     });
@@ -1327,16 +1328,16 @@ function generateBiweeklyPreview() {
     statusOrder.forEach(status => {
       sec.items.filter(i => i.status === status && i.title).forEach(item => {
         out.push(`• [${item.status}]${item.title ? ' ' + item.title : ''}`);
-        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `  ㄴ ${l}` : `    ${l}`));
-        const lw = bulletField('지난 2주', item.lastWeek);
-        const tw = bulletField('금 2주', item.thisWeek);
+        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `    ㄴ ${l}` : `      ${l}`));
+        const lw = bulletField('지난주', item.lastWeek);
+        const tw = bulletField('금주', item.thisWeek);
         const nw = bulletField('다음', item.nextWeek);
         const is = bulletField('이슈', item.issue);
         if (lw) out.push(lw);
         if (tw) out.push(tw);
         if (nw) out.push(nw);
         if (is) out.push(is);
-        item.links.forEach(l => out.push(`  ㄴ 링크: ${l}`));
+        item.links.forEach(l => out.push(`    ㄴ 링크: ${l}`));
         out.push('');
       });
     });
