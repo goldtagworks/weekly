@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Weekly Editor</title>
+<title>Weekly · Monthly Editor</title>
 <style>
 :root {
   --bg:      #f5f7fb;
@@ -22,6 +22,7 @@
   --prog-c:  #b45309; --prog-bg: #fffbeb; --prog-br: #fcd34d;
   --hold-c:  #5b21b6; --hold-bg: #f5f3ff; --hold-br: #c4b5fd;
   --plan-c:  #0f6090; --plan-bg: #eff9ff; --plan-br: #7dd3fc;
+  --issue-c: #be123c; --issue-bg: #fff1f2; --issue-br: #fda4af;
 
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sans: 'Inter', 'Pretendard Variable', Pretendard, sans-serif;
@@ -84,6 +85,30 @@ body {
 .dot-dirty { background: #f59e0b; animation: pulse 1.4s infinite; }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
 .topbar-space { flex: 1; }
+
+/* ── MODE TABS ── */
+.mode-tabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.mode-tab {
+  font-family: var(--sans);
+  border: none;
+  border-radius: 0;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: 0.15s;
+  white-space: nowrap;
+}
+.mode-tab:hover { background: var(--bg); color: var(--text); }
+.mode-tab.active { background: var(--primary); color: #fff; }
 
 /* ── LAYOUT ── */
 .layout {
@@ -256,6 +281,7 @@ button:hover, .button:hover { background: var(--bg); border-color: var(--border2
 .item-card.status-진행중  { border-left: 3px solid var(--prog-c); }
 .item-card.status-홀딩   { border-left: 3px solid var(--hold-c); }
 .item-card.status-예정   { border-left: 3px solid var(--plan-c); }
+.item-card.issue-item   { border-left: 3px solid var(--issue-c); }
 
 .item-head {
   padding: 9px 12px;
@@ -308,6 +334,20 @@ button:hover, .button:hover { background: var(--bg); border-color: var(--border2
   gap: 8px 12px;
 }
 .item-body .full { grid-column: 1 / -1; }
+
+/* ── ISSUE LABEL (monthly) ── */
+.issue-label {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--issue-br);
+  background: var(--issue-bg);
+  color: var(--issue-c);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 /* ── STATUS POPUP ── */
 .status-popup {
@@ -410,7 +450,12 @@ textarea#preview {
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="topbar-brand">Weekly<em>.</em>Editor</div>
+  <div class="topbar-brand">Weekly<em>·</em>Monthly</div>
+  <div class="divider"></div>
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="weekly">위클리</button>
+    <button class="mode-tab" data-mode="monthly">먼슬리</button>
+  </div>
   <div class="divider"></div>
   <div class="file-chip">
     <span class="dot dot-none" id="fileDot"></span>
@@ -434,44 +479,82 @@ textarea#preview {
   <!-- EDITOR COLUMN -->
   <div class="editor-col" id="editorCol">
 
-    <!-- META -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-header-left">
-          <span class="panel-title">편집</span>
-          <span class="panel-subtitle">팀 정보 및 핵심 요약</span>
+    <!-- ── WEEKLY EDITOR ── -->
+    <div id="weeklyEditor">
+
+      <!-- META -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <span class="panel-title">편집</span>
+            <span class="panel-subtitle">팀 정보 및 핵심 요약</span>
+          </div>
+          <div class="toolbar">
+            <button class="btn-sm" id="btnAddSection">+ 섹션 추가</button>
+            <button class="btn-sm primary" onclick="generatePreview()">미리보기 생성</button>
+          </div>
         </div>
-        <div class="toolbar">
-          <button class="btn-sm" id="btnAddSection">+ 섹션 추가</button>
-          <button class="btn-sm primary" onclick="generatePreview()">미리보기 생성</button>
+        <div class="panel-body">
+          <div class="meta-grid">
+            <div class="field">
+              <label for="teamName">팀명</label>
+              <input id="teamName" type="text" placeholder="예: 개발1팀"/>
+            </div>
+            <div class="field">
+              <label for="weekLabel">주차 / 기간</label>
+              <input id="weekLabel" type="text" placeholder="예: 03.10 - 03.14"/>
+            </div>
+          </div>
+
+          <div class="summary-box">
+            <h3>핵심 요약</h3>
+            <div class="summary-grid">
+              <div class="field"><input id="summary1" type="text" placeholder="완료 항목 (예: v2.1.0 정기배포 QA 완료)"/></div>
+              <div class="field"><input id="summary2" type="text" placeholder="진행 항목 (예: 결제 모듈 리팩토링 진행 중)"/></div>
+              <div class="field"><input id="summary3" type="text" placeholder="이슈/다음 일정 (예: 신규 대시보드 UI 설계 착수)"/></div>
+            </div>
+            <div class="summary-hint">상위 책임자용 3줄 요약. 완료 1 · 진행 1 · 이슈 또는 다음 일정 1 권장</div>
+          </div>
         </div>
       </div>
-      <div class="panel-body">
-        <div class="meta-grid">
-          <div class="field">
-            <label for="teamName">팀명</label>
-            <input id="teamName" type="text" placeholder="예: 개발1팀"/>
+
+      <!-- SECTIONS -->
+      <div id="sections"></div>
+
+    </div><!-- /#weeklyEditor -->
+
+    <!-- ── MONTHLY EDITOR ── -->
+    <div id="monthlyEditor" class="hidden">
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <span class="panel-title">먼슬리</span>
+            <span class="panel-subtitle">CTO 보고용 월간 이슈 기록</span>
           </div>
-          <div class="field">
-            <label for="weekLabel">주차 / 기간</label>
-            <input id="weekLabel" type="text" placeholder="예: 03.10 - 03.14"/>
+          <div class="toolbar">
+            <button class="btn-sm" id="btnAddIssueGroup">+ 그룹 추가</button>
+            <button class="btn-sm primary" onclick="generatePreview()">미리보기 생성</button>
           </div>
         </div>
-
-        <div class="summary-box">
-          <h3>핵심 요약</h3>
-          <div class="summary-grid">
-            <div class="field"><input id="summary1" type="text" placeholder="완료 항목 (예: v2.1.0 정기배포 QA 완료)"/></div>
-            <div class="field"><input id="summary2" type="text" placeholder="진행 항목 (예: 결제 모듈 리팩토링 진행 중)"/></div>
-            <div class="field"><input id="summary3" type="text" placeholder="이슈/다음 일정 (예: 신규 대시보드 UI 설계 착수)"/></div>
+        <div class="panel-body">
+          <div class="meta-grid">
+            <div class="field">
+              <label for="monthTeamName">팀명</label>
+              <input id="monthTeamName" type="text" placeholder="예: 개발1팀"/>
+            </div>
+            <div class="field">
+              <label for="monthLabel">월 / 기간</label>
+              <input id="monthLabel" type="text" placeholder="예: 2026-03"/>
+            </div>
           </div>
-          <div class="summary-hint">상위 책임자용 3줄 요약. 완료 1 · 진행 1 · 이슈 또는 다음 일정 1 권장</div>
         </div>
       </div>
-    </div>
 
-    <!-- SECTIONS -->
-    <div id="sections"></div>
+      <!-- ISSUE GROUPS -->
+      <div id="issueGroups"></div>
+
+    </div><!-- /#monthlyEditor -->
 
   </div>
 
@@ -481,14 +564,14 @@ textarea#preview {
   <!-- PREVIEW COLUMN -->
   <div class="preview-col" id="previewCol">
     <div class="preview-header">
-      <span class="preview-label">출력 미리보기</span>
+      <span class="preview-label" id="previewLabel">출력 미리보기</span>
       <div class="toolbar">
         <button class="btn-sm primary" id="btnCopy">텍스트 복사</button>
       </div>
     </div>
     <div class="preview-body">
       <textarea id="preview" spellcheck="false" placeholder="게시판 텍스트가 여기 표시됩니다"></textarea>
-      <div class="preview-rules">
+      <div class="preview-rules" id="previewRules">
         출력 규칙<br/>
         - 팀명 / 기간 / 핵심 요약<br/>
         - 섹션 → 상태별 항목 (완료 → 진행중 → 홀딩 → 예정)<br/>
@@ -579,6 +662,50 @@ textarea#preview {
       <div class="field full">
         <label>링크 (줄바꿈으로 여러 개)</label>
         <textarea data-field="links" placeholder="https://"></textarea>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- MONTHLY TEMPLATES -->
+<template id="issueGroupTemplate">
+  <div class="section-card" data-role="issueGroup">
+    <div class="section-header">
+      <div class="section-title-wrap">
+        <div class="section-title">새 그룹</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn-sm ghost" data-action="addIssue">+ 이슈</button>
+        <button class="btn-sm danger btn-icon" data-action="removeGroup" title="삭제">×</button>
+      </div>
+    </div>
+    <div class="section-meta" style="grid-template-columns: 1fr;">
+      <div class="field">
+        <label>그룹명</label>
+        <input data-field="groupName" type="text" placeholder="예: 장기적 관점에 이슈"/>
+      </div>
+    </div>
+    <div class="section-body" data-role="issues"></div>
+    <div class="section-add-row">
+      <button class="btn-sm ghost" data-action="addIssueBottom">+ 이슈 추가</button>
+    </div>
+  </div>
+</template>
+
+<template id="issueItemTemplate">
+  <div class="item-card issue-item">
+    <div class="item-head">
+      <span class="issue-label">이슈</span>
+      <input class="item-title-input" data-field="issueTitle" type="text" placeholder="이슈 제목 (예: 통합 구조 경계 정의 기준 설정)"/>
+      <div class="item-head-actions">
+        <button class="btn-sm ghost btn-icon" data-action="duplicateIssue" title="복제">⧉</button>
+        <button class="btn-sm danger btn-icon" data-action="removeIssue" title="삭제">×</button>
+      </div>
+    </div>
+    <div class="item-body">
+      <div class="field full">
+        <label>내용 (줄바꿈으로 여러 항목)</label>
+        <textarea data-field="issueContent" rows="4" placeholder="- 세부 내용 1&#10;- 세부 내용 2&#10;- 세부 내용 3"></textarea>
       </div>
     </div>
   </div>
@@ -675,6 +802,39 @@ function exportJson() {
   URL.revokeObjectURL(a.href);
 }
 
+// ── MODE SWITCHING ─────────────────────────────────────────────────
+let currentMode = 'weekly';
+
+const PREVIEW_RULES = {
+  weekly: `출력 규칙<br/>
+- 팀명 / 기간 / 핵심 요약<br/>
+- 섹션 → 상태별 항목 (완료 → 진행중 → 홀딩 → 예정)<br/>
+- 항목: 지난주 / 금주 / 다음 / 이슈 / 링크 순서<br/>
+- 비어 있는 필드는 출력하지 않음`,
+  monthly: `출력 규칙<br/>
+- 팀명 / 월 기간<br/>
+- 그룹명 [그룹명] 형식 헤딩<br/>
+- 이슈 제목 + 내용 항목 순서<br/>
+- 비어 있는 필드는 출력하지 않음`,
+};
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  document.getElementById('weeklyEditor').classList.toggle('hidden', mode !== 'weekly');
+  document.getElementById('monthlyEditor').classList.toggle('hidden', mode !== 'monthly');
+  document.getElementById('btnCarryOver').classList.toggle('hidden', mode !== 'weekly');
+  document.getElementById('previewLabel').textContent = mode === 'monthly' ? '먼슬리 미리보기' : '출력 미리보기';
+  document.getElementById('previewRules').innerHTML = PREVIEW_RULES[mode];
+  generatePreview();
+}
+
+document.querySelectorAll('.mode-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchMode(btn.dataset.mode));
+});
+
 // ── STATUS POPUP ──────────────────────────────────────────────────
 let activeStatusTarget = null;
 
@@ -732,7 +892,6 @@ function addSection(data = null) {
     schedulePreview(); scheduleSave();
   });
 
-  // Both "add item" buttons (header + bottom)
   node.querySelectorAll('[data-action="addItem"], [data-action="addItemBottom"]').forEach(btn => {
     btn.addEventListener('click', () => addItem(itemsWrap));
   });
@@ -772,7 +931,6 @@ function addItem(wrap, data = null) {
     addItem(wrap, collectItem(node)); scheduleSave();
   });
 
-  // Auto-preview on any input change
   node.querySelectorAll('input, textarea, select').forEach(el => {
     el.addEventListener('input', () => { schedulePreview(); scheduleSave(); });
   });
@@ -786,6 +944,62 @@ function addItem(wrap, data = null) {
     node.querySelector('[data-field="issue"]').value = data.issue || '';
     node.querySelector('[data-field="links"]').value = (data.links || []).join('\n');
     setItemStatus(node, data.status || '진행중');
+  }
+
+  wrap.appendChild(node);
+}
+
+// ── MONTHLY BUILDERS ──────────────────────────────────────────────
+function addIssueGroup(data = null) {
+  const tpl = document.getElementById('issueGroupTemplate');
+  const node = tpl.content.firstElementChild.cloneNode(true);
+
+  const nameInp = node.querySelector('[data-field="groupName"]');
+  const issuesWrap = node.querySelector('[data-role="issues"]');
+  const nameDisp = node.querySelector('.section-title');
+
+  nameInp.addEventListener('input', () => {
+    nameDisp.textContent = nameInp.value.trim() || '새 그룹';
+    schedulePreview(); scheduleSave();
+  });
+
+  node.querySelectorAll('[data-action="addIssue"], [data-action="addIssueBottom"]').forEach(btn => {
+    btn.addEventListener('click', () => addIssueItem(issuesWrap));
+  });
+  node.querySelector('[data-action="removeGroup"]').addEventListener('click', () => {
+    node.remove(); schedulePreview(); scheduleSave();
+  });
+
+  if (data) {
+    nameInp.value = data.groupName || '';
+    nameDisp.textContent = data.groupName || '새 그룹';
+    (data.issues || []).forEach(issue => addIssueItem(issuesWrap, issue));
+  } else {
+    addIssueItem(issuesWrap);
+  }
+
+  document.getElementById('issueGroups').appendChild(node);
+  schedulePreview();
+}
+
+function addIssueItem(wrap, data = null) {
+  const tpl = document.getElementById('issueItemTemplate');
+  const node = tpl.content.firstElementChild.cloneNode(true);
+
+  node.querySelector('[data-action="removeIssue"]').addEventListener('click', () => {
+    node.remove(); schedulePreview(); scheduleSave();
+  });
+  node.querySelector('[data-action="duplicateIssue"]').addEventListener('click', () => {
+    addIssueItem(wrap, collectIssueItem(node)); scheduleSave();
+  });
+
+  node.querySelectorAll('input, textarea').forEach(el => {
+    el.addEventListener('input', () => { schedulePreview(); scheduleSave(); });
+  });
+
+  if (data) {
+    node.querySelector('[data-field="issueTitle"]').value = data.title || '';
+    node.querySelector('[data-field="issueContent"]').value = data.content || '';
   }
 
   wrap.appendChild(node);
@@ -816,6 +1030,30 @@ function collectSection(node) {
   };
 }
 
+function collectIssueItem(node) {
+  return {
+    title:   trim(node.querySelector('[data-field="issueTitle"]').value),
+    content: trim(node.querySelector('[data-field="issueContent"]').value),
+  };
+}
+
+function collectIssueGroup(node) {
+  return {
+    groupName: trim(node.querySelector('[data-field="groupName"]').value),
+    issues: [...node.querySelectorAll('.item-card.issue-item')].map(collectIssueItem).filter(i => i.title),
+  };
+}
+
+function collectMonthlyData() {
+  return {
+    teamName:   trim(document.getElementById('monthTeamName').value),
+    monthLabel: trim(document.getElementById('monthLabel').value),
+    issueGroups: [...document.getElementById('issueGroups').querySelectorAll('[data-role="issueGroup"]')]
+      .map(collectIssueGroup)
+      .filter(g => g.groupName || g.issues.length),
+  };
+}
+
 function collectData() {
   return {
     teamName:  trim(document.getElementById('teamName').value),
@@ -828,10 +1066,12 @@ function collectData() {
     sections: [...document.getElementById('sections').querySelectorAll('.section-card')]
       .map(collectSection)
       .filter(s => s.name || s.items.length),
+    monthly: collectMonthlyData(),
   };
 }
 
 function fillData(data) {
+  // weekly
   document.getElementById('teamName').value = data.teamName || '';
   document.getElementById('weekLabel').value = data.weekLabel || '';
   document.getElementById('summary1').value = data.summary?.[0] || '';
@@ -840,6 +1080,15 @@ function fillData(data) {
   document.getElementById('sections').innerHTML = '';
   (data.sections || []).forEach(s => addSection(s));
   if (!data.sections?.length) addSection();
+
+  // monthly
+  const m = data.monthly || {};
+  document.getElementById('monthTeamName').value = m.teamName || data.teamName || '';
+  document.getElementById('monthLabel').value = m.monthLabel || '';
+  document.getElementById('issueGroups').innerHTML = '';
+  (m.issueGroups || []).forEach(g => addIssueGroup(g));
+  if (!m.issueGroups?.length) addIssueGroup();
+
   generatePreview();
 }
 
@@ -856,7 +1105,7 @@ function bulletField(label, value) {
   return ['  ㄴ ' + label + ': ' + lines[0], ...lines.slice(1).map(l => '    ' + l)].join('\n');
 }
 
-function generatePreview() {
+function generateWeeklyPreview() {
   const data = collectData();
   const out = [];
 
@@ -897,6 +1146,43 @@ function generatePreview() {
   document.getElementById('preview').value = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+function generateMonthlyPreview() {
+  const m = collectMonthlyData();
+  const out = [];
+
+  if (m.teamName) out.push(m.teamName);
+  if (m.monthLabel) out.push(`Monthly (${m.monthLabel})`);
+  out.push('');
+
+  m.issueGroups.forEach(group => {
+    if (group.groupName) {
+      out.push(`[${group.groupName}]`);
+      out.push('');
+    }
+    group.issues.forEach(issue => {
+      if (!issue.title) return;
+      out.push(issue.title);
+      out.push('');
+      const lines = toLines(issue.content);
+      lines.forEach(line => {
+        out.push(line.startsWith('-') ? line : `- ${line}`);
+      });
+      if (lines.length) out.push('');
+    });
+    out.push('');
+  });
+
+  document.getElementById('preview').value = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function generatePreview() {
+  if (currentMode === 'monthly') {
+    generateMonthlyPreview();
+  } else {
+    generateWeeklyPreview();
+  }
+}
+
 // ── COPY ──────────────────────────────────────────────────────────
 function copyPreview() {
   generatePreview();
@@ -935,6 +1221,7 @@ function carryOverDraft() {
           links:    i.links || [],
         }))
     })).filter(s => s.items.length),
+    monthly: data.monthly, // 먼슬리는 그대로 유지
   };
   fillData(next);
   scheduleSave();
@@ -968,11 +1255,15 @@ document.addEventListener('keydown', async e => {
 
 // ── EVENT BINDINGS ────────────────────────────────────────────────
 document.getElementById('btnAddSection').addEventListener('click', () => addSection());
+document.getElementById('btnAddIssueGroup').addEventListener('click', () => addIssueGroup());
 document.getElementById('btnCopy').addEventListener('click', copyPreview);
 document.getElementById('btnCarryOver').addEventListener('click', carryOverDraft);
 
 // Auto-preview for meta fields
 ['teamName', 'weekLabel', 'summary1', 'summary2', 'summary3'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { schedulePreview(); scheduleSave(); });
+});
+['monthTeamName', 'monthLabel'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => { schedulePreview(); scheduleSave(); });
 });
 
@@ -1052,6 +1343,25 @@ const SAMPLE = {
       ],
     },
   ],
+  monthly: {
+    teamName: '개발1팀',
+    monthLabel: '2026-03',
+    issueGroups: [
+      {
+        groupName: '장기적 관점에 이슈',
+        issues: [
+          {
+            title: '통합 구조 경계 정의 기준 설정',
+            content: '공통 코어와 플랫폼별 분기, 렌더러(프론트엔드) 영역을 어디까지 명확히 분리할지 판단 필요\n구현이 진행되면서 초기 설계 대비 구조 경계가 흐려질 가능성 존재\n기술적 편의 선택이 장기 구조 복잡도로 이어지지 않도록 통제 기준 필요',
+          },
+          {
+            title: '개발 일정과 구조 정합성 간 균형',
+            content: '단일 코드베이스 전환 과정에서 일정 압박에 따른 임시 처리 코드 누적 가능성 존재\n리팩토링 허용 범위와 시점에 대한 명확한 기준 설정 필요',
+          },
+        ],
+      },
+    ],
+  },
 };
 
 // Try loading from localStorage first, fallback to sample
