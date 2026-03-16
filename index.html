@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Weekly · Monthly Editor</title>
+<title>Weekly · Bi-Weekly · Monthly Editor</title>
 <style>
 :root {
   --bg:      #f5f7fb;
@@ -450,10 +450,11 @@ textarea#preview {
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="topbar-brand">Weekly<em>·</em>Monthly</div>
+  <div class="topbar-brand">Weekly<em>·</em>Bi-Weekly<em>·</em>Monthly</div>
   <div class="divider"></div>
   <div class="mode-tabs">
     <button class="mode-tab active" data-mode="weekly">위클리</button>
+    <button class="mode-tab" data-mode="biweekly">바이 위클리</button>
     <button class="mode-tab" data-mode="monthly">먼슬리</button>
   </div>
   <div class="divider"></div>
@@ -522,6 +523,50 @@ textarea#preview {
       <div id="sections"></div>
 
     </div><!-- /#weeklyEditor -->
+
+    <!-- ── BI-WEEKLY EDITOR ── -->
+    <div id="biweeklyEditor" class="hidden">
+
+      <!-- META -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-header-left">
+            <span class="panel-title">편집</span>
+            <span class="panel-subtitle">팀 정보 및 핵심 요약 (2주 단위)</span>
+          </div>
+          <div class="toolbar">
+            <button class="btn-sm" id="btnAddBiweeklySection">+ 섹션 추가</button>
+            <button class="btn-sm primary" onclick="generatePreview()">미리보기 생성</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="meta-grid">
+            <div class="field">
+              <label for="bwTeamName">팀명</label>
+              <input id="bwTeamName" type="text" placeholder="예: 개발1팀"/>
+            </div>
+            <div class="field">
+              <label for="bwWeekLabel">기간</label>
+              <input id="bwWeekLabel" type="text" placeholder="예: 03.03 - 03.14"/>
+            </div>
+          </div>
+
+          <div class="summary-box">
+            <h3>핵심 요약</h3>
+            <div class="summary-grid">
+              <div class="field"><input id="bwSummary1" type="text" placeholder="완료 항목 (예: v2.1.0 정기배포 QA 완료)"/></div>
+              <div class="field"><input id="bwSummary2" type="text" placeholder="진행 항목 (예: 결제 모듈 리팩토링 진행 중)"/></div>
+              <div class="field"><input id="bwSummary3" type="text" placeholder="이슈/다음 일정 (예: 신규 대시보드 UI 설계 착수)"/></div>
+            </div>
+            <div class="summary-hint">상위 책임자용 3줄 요약. 완료 1 · 진행 1 · 이슈 또는 다음 일정 1 권장</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTIONS -->
+      <div id="biweeklySections"></div>
+
+    </div><!-- /#biweeklyEditor -->
 
     <!-- ── MONTHLY EDITOR ── -->
     <div id="monthlyEditor" class="hidden">
@@ -811,11 +856,22 @@ const PREVIEW_RULES = {
 - 섹션 → 상태별 항목 (완료 → 진행중 → 홀딩 → 예정)<br/>
 - 항목: 지난주 / 금주 / 다음 / 이슈 / 링크 순서<br/>
 - 비어 있는 필드는 출력하지 않음`,
+  biweekly: `출력 규칙<br/>
+- 팀명 / 기간 / 핵심 요약<br/>
+- 섹션 → 상태별 항목 (완료 → 진행중 → 홀딩 → 예정)<br/>
+- 항목: 지난주 / 금주 / 다음 / 이슈 / 링크 순서<br/>
+- 비어 있는 필드는 출력하지 않음`,
   monthly: `출력 규칙<br/>
 - 팀명 / 월 기간<br/>
 - 그룹명 [그룹명] 형식 헤딩<br/>
 - 이슈 제목 + 내용 항목 순서<br/>
 - 비어 있는 필드는 출력하지 않음`,
+};
+
+const PREVIEW_LABELS = {
+  weekly: '출력 미리보기',
+  biweekly: '바이 위클리 미리보기',
+  monthly: '먼슬리 미리보기',
 };
 
 function switchMode(mode) {
@@ -824,9 +880,10 @@ function switchMode(mode) {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   });
   document.getElementById('weeklyEditor').classList.toggle('hidden', mode !== 'weekly');
+  document.getElementById('biweeklyEditor').classList.toggle('hidden', mode !== 'biweekly');
   document.getElementById('monthlyEditor').classList.toggle('hidden', mode !== 'monthly');
-  document.getElementById('btnCarryOver').classList.toggle('hidden', mode !== 'weekly');
-  document.getElementById('previewLabel').textContent = mode === 'monthly' ? '먼슬리 미리보기' : '출력 미리보기';
+  document.getElementById('btnCarryOver').classList.toggle('hidden', mode !== 'weekly' && mode !== 'biweekly');
+  document.getElementById('previewLabel').textContent = PREVIEW_LABELS[mode];
   document.getElementById('previewRules').innerHTML = PREVIEW_RULES[mode];
   generatePreview();
 }
@@ -949,6 +1006,50 @@ function addItem(wrap, data = null) {
   wrap.appendChild(node);
 }
 
+// ── BI-WEEKLY BUILDERS (reuse section/item templates) ─────────────
+function addBiweeklySection(data = null) {
+  const tpl = document.getElementById('sectionTemplate');
+  const node = tpl.content.firstElementChild.cloneNode(true);
+
+  const nameInp = node.querySelector('[data-field="name"]');
+  const descInp = node.querySelector('[data-field="description"]');
+  const itemsWrap = node.querySelector('[data-role="items"]');
+  const nameDisp = node.querySelector('.section-title');
+  const descDisp = node.querySelector('.section-subtitle');
+
+  nameInp.addEventListener('input', () => {
+    nameDisp.textContent = nameInp.value.trim() || '새 섹션';
+    schedulePreview(); scheduleSave();
+  });
+  descInp.addEventListener('input', () => {
+    descDisp.textContent = descInp.value.trim() || '프로젝트/버전 단위로 관리';
+    schedulePreview(); scheduleSave();
+  });
+
+  node.querySelectorAll('[data-action="addItem"], [data-action="addItemBottom"]').forEach(btn => {
+    btn.addEventListener('click', () => addItem(itemsWrap));
+  });
+  node.querySelector('[data-action="removeSection"]').addEventListener('click', () => {
+    node.remove(); schedulePreview(); scheduleSave();
+  });
+  node.querySelector('[data-action="duplicateSection"]').addEventListener('click', () => {
+    addBiweeklySection(collectSection(node)); scheduleSave();
+  });
+
+  if (data) {
+    nameInp.value = data.name || '';
+    descInp.value = data.description || '';
+    nameDisp.textContent = data.name || '새 섹션';
+    descDisp.textContent = data.description || '프로젝트/버전 단위로 관리';
+    (data.items || []).forEach(item => addItem(itemsWrap, item));
+  } else {
+    addItem(itemsWrap);
+  }
+
+  document.getElementById('biweeklySections').appendChild(node);
+  schedulePreview();
+}
+
 // ── MONTHLY BUILDERS ──────────────────────────────────────────────
 function addIssueGroup(data = null) {
   const tpl = document.getElementById('issueGroupTemplate');
@@ -1054,6 +1155,21 @@ function collectMonthlyData() {
   };
 }
 
+function collectBiweeklyData() {
+  return {
+    teamName:  trim(document.getElementById('bwTeamName').value),
+    weekLabel: trim(document.getElementById('bwWeekLabel').value),
+    summary: [
+      trim(document.getElementById('bwSummary1').value),
+      trim(document.getElementById('bwSummary2').value),
+      trim(document.getElementById('bwSummary3').value),
+    ].filter(Boolean),
+    sections: [...document.getElementById('biweeklySections').querySelectorAll('.section-card')]
+      .map(collectSection)
+      .filter(s => s.name || s.items.length),
+  };
+}
+
 function collectData() {
   return {
     teamName:  trim(document.getElementById('teamName').value),
@@ -1066,6 +1182,7 @@ function collectData() {
     sections: [...document.getElementById('sections').querySelectorAll('.section-card')]
       .map(collectSection)
       .filter(s => s.name || s.items.length),
+    biweekly: collectBiweeklyData(),
     monthly: collectMonthlyData(),
   };
 }
@@ -1080,6 +1197,17 @@ function fillData(data) {
   document.getElementById('sections').innerHTML = '';
   (data.sections || []).forEach(s => addSection(s));
   if (!data.sections?.length) addSection();
+
+  // biweekly
+  const bw = data.biweekly || {};
+  document.getElementById('bwTeamName').value = bw.teamName || data.teamName || '';
+  document.getElementById('bwWeekLabel').value = bw.weekLabel || '';
+  document.getElementById('bwSummary1').value = bw.summary?.[0] || '';
+  document.getElementById('bwSummary2').value = bw.summary?.[1] || '';
+  document.getElementById('bwSummary3').value = bw.summary?.[2] || '';
+  document.getElementById('biweeklySections').innerHTML = '';
+  (bw.sections || []).forEach(s => addBiweeklySection(s));
+  if (!bw.sections?.length) addBiweeklySection();
 
   // monthly
   const m = data.monthly || {};
@@ -1115,18 +1243,18 @@ function generateWeeklyPreview() {
 
   if (data.summary.length) {
     out.push('[핵심 요약]');
-    data.summary.forEach(l => out.push(`- ${l}`));
+    data.summary.forEach(l => out.push(`• ${l}`));
     out.push('');
   }
 
   const statusOrder = ['완료', '진행중', '홀딩', '예정'];
   data.sections.forEach((sec, si) => {
     out.push(sec.name);
-    if (sec.description) out.push(`- ${sec.description}`);
+    if (sec.description) out.push(`• ${sec.description}`);
     out.push('');
     statusOrder.forEach(status => {
       sec.items.filter(i => i.status === status && i.title).forEach(item => {
-        out.push(`- [${item.status}]${item.title ? ' ' + item.title : ''}`);
+        out.push(`• [${item.status}]${item.title ? ' ' + item.title : ''}`);
         if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `  ㄴ ${l}` : `    ${l}`));
         const lw = bulletField('지난주', item.lastWeek);
         const tw = bulletField('금주', item.thisWeek);
@@ -1162,7 +1290,7 @@ function generateMonthlyPreview() {
     group.issues.forEach(issue => {
       if (!issue.title && !issue.content) return;
       if (issue.title) {
-        out.push(issue.title);
+        out.push(`◇ ${issue.title}`);
         out.push('');
       }
       const lines = toLines(issue.content);
@@ -1177,9 +1305,52 @@ function generateMonthlyPreview() {
   document.getElementById('preview').value = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+function generateBiweeklyPreview() {
+  const data = collectBiweeklyData();
+  const out = [];
+
+  if (data.teamName) out.push(data.teamName);
+  if (data.weekLabel) out.push(`Bi-Weekly (${data.weekLabel})`);
+  out.push('');
+
+  if (data.summary.length) {
+    out.push('[핵심 요약]');
+    data.summary.forEach(l => out.push(`• ${l}`));
+    out.push('');
+  }
+
+  const statusOrder = ['완료', '진행중', '홀딩', '예정'];
+  data.sections.forEach((sec, si) => {
+    out.push(sec.name);
+    if (sec.description) out.push(`• ${sec.description}`);
+    out.push('');
+    statusOrder.forEach(status => {
+      sec.items.filter(i => i.status === status && i.title).forEach(item => {
+        out.push(`• [${item.status}]${item.title ? ' ' + item.title : ''}`);
+        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `  ㄴ ${l}` : `    ${l}`));
+        const lw = bulletField('지난 2주', item.lastWeek);
+        const tw = bulletField('금 2주', item.thisWeek);
+        const nw = bulletField('다음', item.nextWeek);
+        const is = bulletField('이슈', item.issue);
+        if (lw) out.push(lw);
+        if (tw) out.push(tw);
+        if (nw) out.push(nw);
+        if (is) out.push(is);
+        item.links.forEach(l => out.push(`  ㄴ 링크: ${l}`));
+        out.push('');
+      });
+    });
+    if (si < data.sections.length - 1) out.push('');
+  });
+
+  document.getElementById('preview').value = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function generatePreview() {
   if (currentMode === 'monthly') {
     generateMonthlyPreview();
+  } else if (currentMode === 'biweekly') {
+    generateBiweeklyPreview();
   } else {
     generateWeeklyPreview();
   }
@@ -1223,6 +1394,7 @@ function carryOverDraft() {
           links:    i.links || [],
         }))
     })).filter(s => s.items.length),
+    biweekly: data.biweekly, // 바이 위클리는 그대로 유지
     monthly: data.monthly, // 먼슬리는 그대로 유지
   };
   fillData(next);
@@ -1257,12 +1429,16 @@ document.addEventListener('keydown', async e => {
 
 // ── EVENT BINDINGS ────────────────────────────────────────────────
 document.getElementById('btnAddSection').addEventListener('click', () => addSection());
+document.getElementById('btnAddBiweeklySection').addEventListener('click', () => addBiweeklySection());
 document.getElementById('btnAddIssueGroup').addEventListener('click', () => addIssueGroup());
 document.getElementById('btnCopy').addEventListener('click', copyPreview);
 document.getElementById('btnCarryOver').addEventListener('click', carryOverDraft);
 
 // Auto-preview for meta fields
 ['teamName', 'weekLabel', 'summary1', 'summary2', 'summary3'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { schedulePreview(); scheduleSave(); });
+});
+['bwTeamName', 'bwWeekLabel', 'bwSummary1', 'bwSummary2', 'bwSummary3'].forEach(id => {
   document.getElementById(id).addEventListener('input', () => { schedulePreview(); scheduleSave(); });
 });
 ['monthTeamName', 'monthLabel'].forEach(id => {
