@@ -1026,7 +1026,7 @@ function collectSection(node) {
   return {
     name:        trim(node.querySelector('[data-field="name"]').value),
     description: trim(node.querySelector('[data-field="description"]').value),
-    items: [...node.querySelectorAll('.item-card')].map(collectItem).filter(i => i.title),
+    items: [...node.querySelectorAll('.item-card')].map(collectItem).filter(i => i.title || i.summary || i.thisWeek || i.lastWeek),
   };
 }
 
@@ -1040,7 +1040,7 @@ function collectIssueItem(node) {
 function collectIssueGroup(node) {
   return {
     groupName: trim(node.querySelector('[data-field="groupName"]').value),
-    issues: [...node.querySelectorAll('.item-card.issue-item')].map(collectIssueItem).filter(i => i.title),
+    issues: [...node.querySelectorAll('.item-card.issue-item')].map(collectIssueItem).filter(i => i.title || i.content),
   };
 }
 
@@ -1126,7 +1126,7 @@ function generateWeeklyPreview() {
     out.push('');
     statusOrder.forEach(status => {
       sec.items.filter(i => i.status === status && i.title).forEach(item => {
-        out.push(`- [${item.status}] ${item.title}`);
+        out.push(`- [${item.status}]${item.title ? ' ' + item.title : ''}`);
         if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `  ㄴ ${l}` : `    ${l}`));
         const lw = bulletField('지난주', item.lastWeek);
         const tw = bulletField('금주', item.thisWeek);
@@ -1160,9 +1160,11 @@ function generateMonthlyPreview() {
       out.push('');
     }
     group.issues.forEach(issue => {
-      if (!issue.title) return;
-      out.push(issue.title);
-      out.push('');
+      if (!issue.title && !issue.content) return;
+      if (issue.title) {
+        out.push(issue.title);
+        out.push('');
+      }
       const lines = toLines(issue.content);
       lines.forEach(line => {
         out.push(line.startsWith('-') ? line : `- ${line}`);
