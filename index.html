@@ -1332,44 +1332,40 @@ function schedulePreview() {
   previewTimer = setTimeout(generatePreview, 250);
 }
 
-function bulletField(label, value) {
+function bulletField(label, value, bullet = 'ㄴ') {
   const lines = toLines(value);
   if (lines.length === 0) return '';
-  return ['    ㄴ ' + label + ': ' + lines[0], ...lines.slice(1).map(l => '      ' + l)].join('\n');
+  return ['    ' + bullet + ' ' + label + ': ' + lines[0], ...lines.slice(1).map(l => '      ' + l)].join('\n');
 }
 
 function generateWeeklyPreview() {
   const data = collectData();
   const out = [];
 
-  if (data.teamName) out.push(data.teamName);
-  if (data.weekLabel) out.push(`Weekly (${data.weekLabel})`);
-  out.push('');
-
   if (data.summary.length) {
     out.push('[핵심 요약]');
-    data.summary.forEach(l => out.push(`• ${l}`));
+    data.summary.forEach(l => out.push(`- ${l}`));
     out.push('');
   }
 
   const statusOrder = ['완료', '진행중', '홀딩', '예정'];
   data.sections.forEach((sec, si) => {
     out.push(sec.name);
-    if (sec.description) out.push(`• ${sec.description}`);
+    if (sec.description) out.push(`- ${sec.description}`);
     out.push('');
     statusOrder.forEach(status => {
       sec.items.filter(i => i.status === status && i.title).forEach(item => {
-        out.push(`• [${item.status}]${item.title ? ' ' + item.title : ''}`);
-        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `    ㄴ ${l}` : `      ${l}`));
-        const lw = bulletField('지난주', item.lastWeek);
-        const tw = bulletField('금주', item.thisWeek);
-        const nw = bulletField('다음', item.nextWeek);
-        const is = bulletField('이슈', item.issue);
+        out.push(`- [${item.status}]${item.title ? ' ' + item.title : ''}`);
+        if (item.summary) toLines(item.summary).forEach((l, idx) => out.push(idx === 0 ? `    - ${l}` : `      ${l}`));
+        const lw = bulletField('지난주', item.lastWeek, '-');
+        const tw = bulletField('금주', item.thisWeek, '-');
+        const nw = bulletField('다음', item.nextWeek, '-');
+        const is = bulletField('이슈', item.issue, '-');
         if (lw) out.push(lw);
         if (tw) out.push(tw);
         if (nw) out.push(nw);
         if (is) out.push(is);
-        item.links.forEach(l => out.push(`    ㄴ 링크: ${l}`));
+        item.links.forEach(l => out.push(`    - 링크: ${l}`));
         out.push('');
       });
     });
@@ -1382,10 +1378,6 @@ function generateWeeklyPreview() {
 function generateMonthlyPreview() {
   const m = collectMonthlyData();
   const out = [];
-
-  if (m.teamName) out.push(m.teamName);
-  if (m.monthLabel) out.push(`Monthly (${m.monthLabel})`);
-  out.push('');
 
   m.issueGroups.forEach(group => {
     if (group.groupName) {
