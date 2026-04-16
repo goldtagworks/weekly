@@ -252,7 +252,8 @@ button:active { transform: translateY(0); }
   box-shadow: 0 0 0 4px rgba(79, 172, 254, 0.2), inset 0 1px 2px rgba(0,0,0,0.01);
   transform: translateY(-1px);
 }
-.field textarea { resize: vertical; min-height: 80px; }
+.field textarea { resize: vertical; min-height: 40px; overflow: hidden; }
+.field textarea.auto-grow { overflow: hidden; }
 .field input::placeholder, .field textarea::placeholder { color: var(--faint); font-weight: 400; }
 
 /* ── SUMMARY CARD ── */
@@ -309,7 +310,6 @@ button:active { transform: translateY(0); }
 }
 .section-title-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .section-title { font-size: 18px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.section-subtitle { font-size: 13px; color: var(--muted); }
 .section-meta {
   padding: 16px 20px;
   display: grid;
@@ -720,7 +720,6 @@ textarea#preview:focus { border-color: var(--primary); background: #fff; box-sha
       <span class="section-number">1</span>
       <div class="section-title-wrap">
         <div class="section-title">새 섹션</div>
-        <div class="section-subtitle">프로젝트/버전 단위로 관리</div>
       </div>
       <div class="toolbar">
         <button class="btn-sm ghost" data-action="addItem">+ 항목</button>
@@ -732,10 +731,6 @@ textarea#preview:focus { border-color: var(--primary); background: #fff; box-sha
       <div class="field">
         <label>섹션명</label>
         <input data-field="name" type="text" placeholder="예: [서비스] 백엔드 API"/>
-      </div>
-      <div class="field">
-        <label>설명</label>
-        <input data-field="description" type="text" placeholder="예: 정기배포 / 결제 / 성능 개선"/>
       </div>
     </div>
     <div class="section-body" data-role="items"></div>
@@ -768,15 +763,15 @@ textarea#preview:focus { border-color: var(--primary); background: #fff; box-sha
       </div>
       <div class="field">
         <label>지난주</label>
-        <textarea data-field="lastWeek" placeholder="지난주 완료 내용"></textarea>
+        <textarea data-field="lastWeek" placeholder="지난주 완료 내용&#10;(줄바꿈으로 여러 항목 입력)"></textarea>
       </div>
       <div class="field">
         <label>금주</label>
-        <textarea data-field="thisWeek" placeholder="이번주 진행 내용"></textarea>
+        <textarea data-field="thisWeek" placeholder="이번주 진행 내용&#10;(줄바꿈으로 여러 항목 입력)"></textarea>
       </div>
       <div class="field">
         <label>다음</label>
-        <textarea data-field="nextWeek" placeholder="다음주 예정"></textarea>
+        <textarea data-field="nextWeek" placeholder="다음주 예정&#10;(줄바꿈으로 여러 항목 입력)"></textarea>
       </div>
       <div class="field">
         <label>이슈</label>
@@ -1017,17 +1012,11 @@ function addSection(data = null) {
   const node = tpl.content.firstElementChild.cloneNode(true);
 
   const nameInp = node.querySelector('[data-field="name"]');
-  const descInp = node.querySelector('[data-field="description"]');
   const itemsWrap = node.querySelector('[data-role="items"]');
   const nameDisp = node.querySelector('.section-title');
-  const descDisp = node.querySelector('.section-subtitle');
 
   nameInp.addEventListener('input', () => {
     nameDisp.textContent = nameInp.value.trim() || '새 섹션';
-    schedulePreview(); scheduleSave();
-  });
-  descInp.addEventListener('input', () => {
-    descDisp.textContent = descInp.value.trim() || '프로젝트/버전 단위로 관리';
     schedulePreview(); scheduleSave();
   });
 
@@ -1043,9 +1032,7 @@ function addSection(data = null) {
 
   if (data) {
     nameInp.value = data.name || '';
-    descInp.value = data.description || '';
     nameDisp.textContent = data.name || '새 섹션';
-    descDisp.textContent = data.description || '프로젝트/버전 단위로 관리';
     (data.items || []).forEach(item => addItem(itemsWrap, item));
   } else {
     addItem(itemsWrap);
@@ -1087,6 +1074,7 @@ function addItem(wrap, data = null) {
   }
 
   wrap.appendChild(node);
+  bindAutoGrow(node);
 }
 
 // ── BI-WEEKLY BUILDERS (reuse section/item templates) ─────────────
@@ -1095,17 +1083,11 @@ function addBiweeklySection(data = null) {
   const node = tpl.content.firstElementChild.cloneNode(true);
 
   const nameInp = node.querySelector('[data-field="name"]');
-  const descInp = node.querySelector('[data-field="description"]');
   const itemsWrap = node.querySelector('[data-role="items"]');
   const nameDisp = node.querySelector('.section-title');
-  const descDisp = node.querySelector('.section-subtitle');
 
   nameInp.addEventListener('input', () => {
     nameDisp.textContent = nameInp.value.trim() || '새 섹션';
-    schedulePreview(); scheduleSave();
-  });
-  descInp.addEventListener('input', () => {
-    descDisp.textContent = descInp.value.trim() || '프로젝트/버전 단위로 관리';
     schedulePreview(); scheduleSave();
   });
 
@@ -1121,9 +1103,7 @@ function addBiweeklySection(data = null) {
 
   if (data) {
     nameInp.value = data.name || '';
-    descInp.value = data.description || '';
     nameDisp.textContent = data.name || '새 섹션';
-    descDisp.textContent = data.description || '프로젝트/버전 단위로 관리';
     (data.items || []).forEach(item => addItem(itemsWrap, item));
   } else {
     addItem(itemsWrap);
@@ -1189,6 +1169,20 @@ function addIssueItem(wrap, data = null) {
   }
 
   wrap.appendChild(node);
+  bindAutoGrow(node);
+}
+
+// ── AUTO-GROW TEXTAREA ───────────────────────────────────────────
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+function bindAutoGrow(container) {
+  container.querySelectorAll('textarea').forEach(ta => {
+    ta.classList.add('auto-grow');
+    ta.addEventListener('input', () => autoGrow(ta));
+    requestAnimationFrame(() => autoGrow(ta));
+  });
 }
 
 // ── COLLECT DATA ──────────────────────────────────────────────────
@@ -1211,7 +1205,7 @@ function collectItem(node) {
 function collectSection(node) {
   return {
     name:        trim(node.querySelector('[data-field="name"]').value),
-    description: trim(node.querySelector('[data-field="description"]').value),
+    description: '',
     items: [...node.querySelectorAll('.item-card')].map(collectItem).filter(i => i.title || i.summary || i.thisWeek || i.lastWeek),
   };
 }
@@ -1335,7 +1329,8 @@ function schedulePreview() {
 function bulletField(label, value, bullet = 'ㄴ') {
   const lines = toLines(value);
   if (lines.length === 0) return '';
-  return ['    ' + bullet + ' ' + label + ': ' + lines[0], ...lines.slice(1).map(l => '      ' + l)].join('\n');
+  if (lines.length === 1) return '    ' + bullet + ' ' + label + ': ' + lines[0];
+  return ['    ' + bullet + ' ' + label + ':', ...lines.map(l => '      - ' + l)].join('\n');
 }
 
 function generateWeeklyPreview() {
@@ -1351,7 +1346,6 @@ function generateWeeklyPreview() {
   const statusOrder = ['완료', '진행중', '홀딩', '예정'];
   data.sections.forEach((sec, si) => {
     out.push(sec.name);
-    if (sec.description) out.push(`- ${sec.description}`);
     out.push('');
     statusOrder.forEach(status => {
       sec.items.filter(i => i.status === status && i.title).forEach(item => {
@@ -1420,7 +1414,6 @@ function generateBiweeklyPreview() {
   const statusOrder = ['완료', '진행중', '홀딩', '예정'];
   data.sections.forEach((sec, si) => {
     out.push(sec.name);
-    if (sec.description) out.push(`• ${sec.description}`);
     out.push('');
     statusOrder.forEach(status => {
       sec.items.filter(i => i.status === status && i.title).forEach(item => {
@@ -1478,7 +1471,7 @@ function carryOverDraft() {
     summary: [],
     sections: data.sections.map(s => ({
       name: s.name,
-      description: s.description,
+      description: '',
       items: s.items
         .filter(i => i.status !== '완료')
         .map(i => ({
@@ -1603,7 +1596,7 @@ const SAMPLE = {
   sections: [
     {
       name: '[서비스] 백엔드 API',
-      description: '정기배포 / 결제 / 성능 개선',
+      description: '',
       items: [
         { status: '완료', title: 'v2.1.0 정기배포 QA', summary: 'API 응답 속도 개선 및 버그 수정 포함', lastWeek: 'QA 테스트 진행', thisWeek: 'QA 완료 및 배포', nextWeek: '', issue: '', links: [] },
         { status: '진행중', title: '결제 모듈 리팩토링', summary: 'PG사 연동 구조 개선, 에러 핸들링 강화', lastWeek: '기존 코드 분석 및 설계', thisWeek: '핵심 모듈 리팩토링 진행', nextWeek: '단위 테스트 작성', issue: 'PG사 테스트 환경 접속 지연', links: [] },
@@ -1612,7 +1605,7 @@ const SAMPLE = {
     },
     {
       name: '[서비스] 프론트엔드',
-      description: '대시보드 / UI 개선 / 접근성',
+      description: '',
       items: [
         { status: '진행중', title: '신규 대시보드 UI 설계', summary: '디자인 시안 기반 컴포넌트 구조 설계', lastWeek: '디자인 시안 검토', thisWeek: '컴포넌트 구조 설계 진행', nextWeek: '프로토타입 개발', issue: '', links: [] },
         { status: '홀딩', title: '다크모드 지원', summary: '디자인 가이드 확정 대기', lastWeek: '기술 검토 완료', thisWeek: '', nextWeek: '', issue: '디자인 가이드 미확정', links: [] },
